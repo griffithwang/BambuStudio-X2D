@@ -1223,8 +1223,9 @@ struct Sidebar::priv
 
 void Sidebar::priv::layout_printer(bool isBBL, NozzleLayout layout)
 {
-    const bool supports_multi_diameter = isBBL && layout == NozzleLayout::SingleExtruderRack;
     PresetBundle *preset_bundle = wxGetApp().preset_bundle;
+    const bool supports_multi_diameter = isBBL && supports_multi_diameter_printing(
+        preset_bundle->printers.get_edited_preset().config);
     const bool current_multi_diameter_mode =
         multi_nozzle_diameter_mode_enabled(preset_bundle->project_config);
     const bool leaving_multi_diameter_machine =
@@ -2146,6 +2147,18 @@ bool Sidebar::priv::apply_multi_nozzle_diameter_mode(bool enabled, const std::op
         return false;
     if (option->value == enabled)
         return true;
+
+    const Preset &current_printer = wxGetApp().preset_bundle->printers.get_edited_preset();
+    if (supports_multi_diameter_printing(current_printer.config) &&
+        !is_single_ext_multi_nozzle(current_printer.config)) {
+        option->value = enabled;
+        refresh_multi_nozzle_preset_choices();
+        wxGetApp().preset_bundle->nozzle_inventory.select_printer(wxGetApp().preset_bundle->printers);
+        if (Tab *print_tab = wxGetApp().get_tab(Preset::TYPE_PRINT))
+            print_tab->update_toggled_lines();
+        wxGetApp().plater()->on_config_change(wxGetApp().preset_bundle->full_config());
+        return true;
+    }
 
     if (enabled) {
         discard_process_edits_before_multi_nozzle_mode();

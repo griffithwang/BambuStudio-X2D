@@ -224,7 +224,7 @@ static std::vector<std::set<std::string>> get_filament_allowed_diameters(size_t 
     const auto joined = preset_bundle->compute_filament_supported_nozzle_diameters(filament_count);
     for (size_t i = 0; i < filament_count && i < joined.size(); ++i)
         result[i] = split_diameter_set(joined[i]);
-    const bool supports_multi_diameter = is_single_ext_multi_nozzle(
+    const bool supports_multi_diameter = supports_multi_diameter_printing(
         preset_bundle->printers.get_edited_preset().config);
     if (supports_multi_diameter && multi_nozzle_diameter_mode_enabled(preset_bundle->project_config)) {
         const auto *selected = preset_bundle->project_config.option<ConfigOptionStrings>("filament_diameter_map");

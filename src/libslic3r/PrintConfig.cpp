@@ -293,6 +293,9 @@ bool has_multiple_configured_nozzle_diameters(const ConfigBase &config)
 
 double layer_grid_nozzle_diameter(const ConfigBase &config)
 {
+    if (multi_nozzle_diameter_mode_enabled(config) && supports_multi_diameter_printing(config) &&
+        !is_single_ext_multi_nozzle(config))
+        return 0.2;
     const double primary = primary_nozzle_diameter(config);
     if (! multi_nozzle_diameter_mode_enabled(config) || primary <= EPSILON)
         return primary;
@@ -1207,6 +1210,27 @@ bool is_single_ext_multi_nozzle(const ConfigBase& config)
     const auto* max_nozzle_count = config.option<ConfigOptionIntsNullable>("extruder_max_nozzle_count");
     return max_nozzle_count && std::any_of(max_nozzle_count->values.begin(), max_nozzle_count->values.end(),
                                            [](int v) { return v > 1; });
+}
+
+bool supports_multi_diameter_printing(const ConfigBase &config)
+{
+    if (is_single_ext_multi_nozzle(config))
+        return true;
+
+    const auto *model = config.option<ConfigOptionString>("printer_model");
+    const auto *diameters = config.option<ConfigOptionFloatsNullable>("nozzle_diameter");
+    const auto *hotend_as_extruder = config.option<ConfigOptionBool>("handle_hotend_as_extruder");
+    // X2D has two independent fixed extruders, each with one physical nozzle. Its
+    // filament-to-nozzle map uses the native per-extruder diameter path.
+    return model != nullptr && model->value == "Bambu Lab X2D" && diameters != nullptr &&
+           diameters->size() == 2 && (hotend_as_extruder == nullptr || !hotend_as_extruder->value);
+}
+
+bool x2d_multi_diameter_mode_enabled(const ConfigBase &config)
+{
+    return multi_nozzle_diameter_mode_enabled(config) &&
+           supports_multi_diameter_printing(config) &&
+           !is_single_ext_multi_nozzle(config);
 }
 
 std::vector<std::map<NozzleVolumeType,int>> get_extruder_nozzle_stats(const std::vector<std::string>& strs)

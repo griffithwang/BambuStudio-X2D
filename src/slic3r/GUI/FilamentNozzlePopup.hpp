@@ -62,6 +62,7 @@ private:
     // print with -- read once per popup so the row builders do not each re-derive them.
     std::vector<std::string>                          m_printer_diameters;
     std::set<std::pair<std::string, NozzleVolumeType>> m_rack;
+    std::set<std::pair<std::string, NozzleVolumeType>> m_fixed_nozzles;
     std::vector<std::string>                          m_filament_diameters;
     std::vector<std::string>                          m_filament_variants;
     bool                                              m_filament_variants_complete = false;

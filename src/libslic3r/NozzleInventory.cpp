@@ -134,6 +134,8 @@ SelectedPrinter read_selected_printer(const PresetCollection &printers)
     printer.model                   = config.opt_string("printer_model");
     printer.history_key             = base ? base->name : selected.name;
     printer.diameter                = format_diameter_to_str(string_to_double_decimal_point(config.opt_string("printer_variant")));
+    // Multi-diameter printing on X2D selects between fixed extruders; nozzle inventory
+    // grouping remains the single-extruder rack feature used by H3C.
     printer.supports_multi_diameter = is_single_ext_multi_nozzle(config);
 
     const auto  *nozzle_diameters = config.option<ConfigOptionFloatsNullable>("nozzle_diameter");

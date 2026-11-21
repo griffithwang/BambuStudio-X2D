@@ -3728,6 +3728,18 @@ static std::set<std::string> collect_configured_nozzle_diameters(const PresetBun
     std::set<std::string> result;
     const Preset &printer = bundle.printers.get_edited_preset();
 
+    // X2D has one fixed nozzle on each of its two extruders. Its diameters come from the
+    // printer configuration itself, not from NozzleInventory (which models interchangeable
+    // nozzles on an H3C-style rack).
+    if (x2d_multi_diameter_mode_enabled(bundle.project_config)) {
+        if (const auto *diameters = printer.config.option<ConfigOptionFloatsNullable>("nozzle_diameter"))
+            for (double diameter : diameters->values)
+                if (diameter > 0.0)
+                    result.insert(format_diameter_to_str(diameter));
+        if (!result.empty())
+            return result;
+    }
+
     // With the project-level gate off the machine offers exactly one diameter - the one its printer preset
     // is on - no matter how many the rack physically carries. Every caller keys its single-diameter branch
     // on this set holding fewer than two entries, so the whole preset/selector side follows from here.
@@ -4246,7 +4258,7 @@ void PresetBundle::validate_filament_nozzle_diameter_selections(const std::map<i
     auto *selected = project_config.option<ConfigOptionStrings>("filament_diameter_map");
     selected->values.resize(filament_presets.size());
     const bool supports_multi_diameter =
-        is_single_ext_multi_nozzle(printers.get_edited_preset().config);
+        supports_multi_diameter_printing(printers.get_edited_preset().config);
     if (!supports_multi_diameter) {
         if (auto *mode = project_config.option<ConfigOptionBool>("multi_nozzle_diameter_mode"))
             mode->value = false;
@@ -4275,8 +4287,11 @@ void PresetBundle::validate_filament_nozzle_diameter_selections(const std::map<i
     // a plain machine.
     const bool multi_diameter_mode =
         multi_nozzle_diameter_mode_enabled(project_config) && supports_multi_diameter;
+    const bool per_filament_diameter_mode = multi_diameter_mode &&
+        (is_single_ext_multi_nozzle(printers.get_edited_preset().config) ||
+         x2d_multi_diameter_mode_enabled(project_config));
     const std::vector<std::string> retained_selections =
-        multi_diameter_mode ? std::vector<std::string>{} : selected->values;
+        per_filament_diameter_mode ? std::vector<std::string>{} : selected->values;
     const auto printer_name_to_diameter = build_printer_name_to_diameter(*this);
     const auto configured = collect_configured_nozzle_diameters(*this);
     const auto installed = collect_installed_nozzle_variants(*this);
@@ -5071,7 +5086,8 @@ DynamicPrintConfig PresetBundle::full_fff_config(bool apply_extruder, std::optio
     // with it off the printer preset's own nozzle_diameter and no per-filament selection is all slicing sees.
     const bool multi_diameter_mode = multi_nozzle_diameter_mode_enabled(this->project_config);
     if (auto *nozzle_diameter_opt = out.option<ConfigOptionFloatsNullable>("nozzle_diameter");
-        multi_diameter_mode && uses_per_slot_nozzle_diameters(out) &&
+        multi_diameter_mode && !x2d_multi_diameter_mode_enabled(this->project_config) &&
+        uses_per_slot_nozzle_diameters(out) &&
         nozzle_diameter_opt != nullptr && this->nozzle_inventory.extruder_count() > 0) {
         nozzle_diameter_opt->values = smallest_installed_diameters(this->nozzle_inventory, nozzle_diameter_opt->values);
     }

@@ -86,6 +86,7 @@ void FilamentNozzlePopup::read_slot_state()
 {
     m_printer_diameters.clear();
     m_rack.clear();
+    m_fixed_nozzles.clear();
     m_filament_diameters.clear();
     m_filament_variants = {"Direct Drive Standard"};
     m_filament_variants_complete = false;
@@ -96,9 +97,30 @@ void FilamentNozzlePopup::read_slot_state()
 
     PresetBundle *preset_bundle = wxGetApp().preset_bundle;
 
+    const DynamicPrintConfig &printer = preset_bundle->printers.get_edited_preset().config;
+    const bool x2d_multi = x2d_multi_diameter_mode_enabled(preset_bundle->project_config) &&
+                           supports_multi_diameter_printing(printer);
+    if (x2d_multi) {
+        if (const auto *diameters = printer.option<ConfigOptionFloatsNullable>("nozzle_diameter")) {
+            const auto *flows = preset_bundle->project_config.option<ConfigOptionEnumsGeneric>("nozzle_volume_type");
+            for (size_t i = 0; i < diameters->values.size(); ++i) {
+                if (diameters->values[i] <= 0.) continue;
+                const std::string diameter = format_diameter_to_str(diameters->values[i]);
+                m_printer_diameters.push_back(diameter);
+                const auto flow = flows && i < flows->values.size()
+                    ? static_cast<NozzleVolumeType>(flows->values[i]) : nvtStandard;
+                m_fixed_nozzles.emplace(diameter, flow);
+            }
+            std::sort(m_printer_diameters.begin(), m_printer_diameters.end());
+            m_printer_diameters.erase(std::unique(m_printer_diameters.begin(), m_printer_diameters.end()), m_printer_diameters.end());
+        }
+    }
+
     // Every diameter this printer is sold in, not just the ones on the rack: a diameter the user
-    // could install but has not is exactly what the faded rows are there to show.
-    m_printer_diameters = preset_bundle->printers.diameters_of_selected_printer();
+    // could install but has not is exactly what the faded rows are there to show. X2D instead has
+    // two fixed installed nozzles; its candidate list above is authoritative for this mode.
+    if (!x2d_multi)
+        m_printer_diameters = preset_bundle->printers.diameters_of_selected_printer();
 
     // Hybrid is a slicing construct rather than a nozzle anyone installs, so it never reaches a row.
     for (const auto &nozzle : preset_bundle->get_installed_nozzle_variants()) {
@@ -165,7 +187,7 @@ std::vector<FilamentNozzlePopup::FlowRow> FilamentNozzlePopup::flow_rows_for(con
         FlowRow row;
         row.volume    = volume;
         row.label     = _L(def->enum_labels[j]);
-        row.installed = m_rack.count({diameter, volume}) > 0;
+        row.installed = m_fixed_nozzles.count({diameter, volume}) > 0 || m_rack.count({diameter, volume}) > 0;
         row.usable    = is_nozzle_printable_for_filament(volume, m_filament_variants, m_filament_variants_complete);
         rows.push_back(row);
     }
@@ -230,7 +252,9 @@ void FilamentNozzlePopup::build_menu()
         // filament with no preset at that diameter is a fact about the filament. The settings are
         // checked first because m_filament_diameters is already narrowed to them, so a diameter
         // missing from that list alone does not say which of the two it is.
-        const bool installed = std::any_of(m_rack.begin(), m_rack.end(),
+        const bool installed = std::any_of(m_fixed_nozzles.begin(), m_fixed_nozzles.end(),
+                                           [&diameter](const auto &n) { return n.first == diameter; }) ||
+                               std::any_of(m_rack.begin(), m_rack.end(),
                                            [&diameter](const auto &n) { return n.first == diameter; });
         const bool pickable  = installed && std::find(m_filament_diameters.begin(), m_filament_diameters.end(), diameter) !=
                                                 m_filament_diameters.end();
