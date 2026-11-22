@@ -111,7 +111,7 @@ function(prepare_node_env)
             )
         endif()
 
-        if(NOT extract_result EQUAL 0)
+        if(NOT WIN32 AND NOT extract_result EQUAL 0)
             message(FATAL_ERROR "Failed to extract Node.js archive: ${extract_error}")
         endif()
 
