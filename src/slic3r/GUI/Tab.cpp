@@ -6509,6 +6509,7 @@ void TabPrinter::toggle_options()
         bool have_retract_length = m_config->opt_float_nullable("retraction_length", variant_index) > 0;
         const bool multi_nozzle_mode = m_preset_bundle != nullptr &&
             multi_nozzle_diameter_mode_enabled(m_preset_bundle->project_config);
+        const bool x2d_nozzle_setup = multi_nozzle_mode && m_config->opt_string("printer_model") == "Bambu Lab X2D";
 
         //BBS
         for (auto el : { "extruder_type" , "nozzle_diameter"}) {
@@ -6516,8 +6517,8 @@ void TabPrinter::toggle_options()
         }
 
         toggle_option("extruder_type", !is_BBL_printer, i);
-        toggle_option("nozzle_diameter", !is_BBL_printer || config_mode == ConfigOptionMode::comDevelop, i);
-        toggle_line("nozzle_diameter", !multi_nozzle_mode, i);
+        toggle_option("nozzle_diameter", !is_BBL_printer || config_mode == ConfigOptionMode::comDevelop || x2d_nozzle_setup, i);
+        toggle_line("nozzle_diameter", !multi_nozzle_mode || x2d_nozzle_setup, i);
         toggle_option("extruder_offset", !is_BBL_printer || config_mode == ConfigOptionMode::comDevelop, i);
 
         toggle_option("extruder_printable_area", false, i);          // disable
